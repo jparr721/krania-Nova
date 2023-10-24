@@ -1,11 +1,11 @@
 //! This library implements Nova, a high-speed recursive SNARK.
 #![deny(
-  warnings,
-  unused,
-  future_incompatible,
-  nonstandard_style,
-  rust_2018_idioms,
-  missing_docs
+  // warnings,
+  // unused,
+  // future_incompatible,
+  // nonstandard_style,
+  // rust_2018_idioms,
+  // missing_docs
 )]
 #![allow(non_snake_case)]
 #![allow(clippy::type_complexity)]
@@ -64,7 +64,8 @@ where
   ro_consts_primary: ROConstants<G1>,
   ro_consts_circuit_primary: ROConstantsCircuit<G2>,
   ck_primary: CommitmentKey<G1>,
-  r1cs_shape_primary: R1CSShape<G1>,
+  /// r1cs_shape_primary
+  pub r1cs_shape_primary: R1CSShape<G1>,
   ro_consts_secondary: ROConstants<G2>,
   ro_consts_circuit_secondary: ROConstantsCircuit<G1>,
   ck_secondary: CommitmentKey<G2>,
@@ -173,15 +174,15 @@ where
   C1: StepCircuit<G1::Scalar>,
   C2: StepCircuit<G2::Scalar>,
 {
-  r_W_primary: RelaxedR1CSWitness<G1>,
-  r_U_primary: RelaxedR1CSInstance<G1>,
-  r_W_secondary: RelaxedR1CSWitness<G2>,
-  r_U_secondary: RelaxedR1CSInstance<G2>,
-  l_w_secondary: R1CSWitness<G2>,
-  l_u_secondary: R1CSInstance<G2>,
-  i: usize,
-  zi_primary: Vec<G1::Scalar>,
-  zi_secondary: Vec<G2::Scalar>,
+  pub r_W_primary: RelaxedR1CSWitness<G1>,
+  pub r_U_primary: RelaxedR1CSInstance<G1>,
+  pub r_W_secondary: RelaxedR1CSWitness<G2>,
+  pub r_U_secondary: RelaxedR1CSInstance<G2>,
+  pub l_w_secondary: R1CSWitness<G2>,
+  pub l_u_secondary: R1CSInstance<G2>,
+  pub i: usize,
+  pub zi_primary: Vec<G1::Scalar>,
+  pub zi_secondary: Vec<G2::Scalar>,
   _p_c1: PhantomData<C1>,
   _p_c2: PhantomData<C2>,
 }

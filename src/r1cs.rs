@@ -25,6 +25,15 @@ pub struct R1CS<G: Group> {
   _p: PhantomData<G>,
 }
 
+/// A type that holds the augmented R1CS matrices
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompilableAugmentedR1CS<G: Group> {
+  pub A: Vec<(usize, usize, G::Scalar)>,
+  pub B: Vec<(usize, usize, G::Scalar)>,
+  pub C: Vec<(usize, usize, G::Scalar)>,
+  pub z_prime: Vec<G::Scalar>,
+}
+
 /// A type that holds the shape of the R1CS matrices
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct R1CSShape<G: Group> {
@@ -168,6 +177,97 @@ impl<G: Group> R1CSShape<G> {
     );
 
     Ok((Az, Bz, Cz))
+  }
+
+  /// ## Summary
+  /// Given the claimed relaxed instance [w], [E] that allegedly satisfies
+  /// Aw * Bw  - u Cw = E, we rescale commitments as follows:
+  /// [w'] = u^(-1) [w], [E'] = u^(-2) E. Where u is treated as an external value
+  /// not included in [w] and all other public inputs should be treated
+  /// as if they are part of [w]
+  ///
+  /// Then, substituting this into the equation, we get
+  ///
+  /// Aw' * Bw' - Cw' = E'
+  ///
+  /// This is a non-relaxed R1CS on the vector w'|E', with new matrices A, B, C
+  /// having the following block forms:
+  ///
+  /// | A | B | C  |
+  /// |---|---|----|
+  /// | 0 | 0 | ID |
+  ///
+  /// ## Conversion Steps
+  /// Method is based on is_sat_relaxed which verifies that Az * Bz = u*Cz + E.
+  /// This is then notated as Az * Bz - u*Cz = E, so our relaxed instance [z], [E]
+  /// incudes
+  /// z' = [[w, u, x], E'] // Page 14 [https://eprint.iacr.org/2021/370.pdf]
+  /// E' = u^{-2}E
+  /// This gives us the following:
+  /// Az' * Bz' - Cz' = 0
+  /// And we're done.
+  pub fn relaxed_r1cs_to_vanilla_r1cs(
+    &self,
+    U: &RelaxedR1CSInstance<G>,
+    W: &RelaxedR1CSWitness<G>,
+  ) -> CompilableAugmentedR1CS<G> {
+    let z_relaxed = concat(vec![W.W.clone(), vec![U.u], U.X.clone()]);
+    let u_inverse = U.u.invert().unwrap();
+    let u_pow_negative_2 = u_inverse * u_inverse;
+    let Eprime = W
+      .E
+      .iter()
+      .map(|e| *e * u_pow_negative_2)
+      .collect::<Vec<G::Scalar>>();
+
+    let z_prime = concat(vec![z_relaxed.clone(), Eprime.clone()]);
+
+    // Add a zero-component of size Eprime to each matrix A, B, C
+    let new_A = self
+      .A
+      .iter()
+      .map(|(r, c, v)| (*r, *c, *v))
+      .chain((0..Eprime.len()).map(|i| {
+        (
+          i + self.num_cons,
+          self.num_vars + self.num_io,
+          G::Scalar::ZERO,
+        )
+      }))
+      .collect::<Vec<_>>();
+
+    let new_B = self
+      .B
+      .iter()
+      .map(|(r, c, v)| (*r, *c, *v))
+      .chain((0..Eprime.len()).map(|i| {
+        (
+          i + self.num_cons,
+          self.num_vars + self.num_io,
+          G::Scalar::ZERO,
+        )
+      }))
+      .collect::<Vec<_>>();
+    let new_C = self
+      .C
+      .iter()
+      .map(|(r, c, v)| (*r, *c, *v))
+      .chain((0..Eprime.len()).map(|i| {
+        (
+          i + self.num_cons,
+          self.num_vars + self.num_io,
+          G::Scalar::ZERO,
+        )
+      }))
+      .collect::<Vec<_>>();
+
+    // Return the new struct object
+    CompilableAugmentedR1CS {
+      A: new_A,
+      B: new_B,
+      C: new_C,
+      z_prime,
+    }
   }
 
   /// Checks if the Relaxed R1CS instance is satisfiable given a witness and its shape
